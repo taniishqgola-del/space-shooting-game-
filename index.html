@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Galactic Guardian X</title>
+<style>
+body{
+    margin:0;
+    overflow:hidden;
+    background:black;
+    font-family:Arial;
+}
+canvas{display:block;}
+#restartBtn{
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    padding:15px 30px;
+    font-size:20px;
+    display:none;
+    cursor:pointer;
+}
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+<button id="restartBtn">Restart Game</button>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const c = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let keys = {};
+let gameOver = false;
+let health = 100;
+let score = 0;
+let highScore = 0;
+let enemySpeed = 3;
+
+const restartBtn = document.getElementById("restartBtn");
+
+const player = {
+    width:50,
+    height:80,
+    x: canvas.width/2 - 25,
+    y: canvas.height - 120,
+    speed:7
+};
+
+let enemies = [];
+let bullets = [];
+let stars = [];
+
+for(let i=0;i<150;i++){
+    stars.push({
+        x:Math.random()*canvas.width,
+        y:Math.random()*canvas.height,
+        size:Math.random()*2
+    });
+}
+
+function spawnEnemy(){
+    enemies.push({
+        x: Math.random() * (canvas.width - 40),
+        y: -60,
+        width:40,
+        height:60,
+        speed: enemySpeed
+    });
+}
+setInterval(spawnEnemy, 1200);
+
+document.addEventListener("keydown",(e)=>{
+    keys[e.key.toLowerCase()] = true;
+
+    if(e.code === "Space"){
+        bullets.push({
+            x: player.x + player.width/2 -3,
+            y: player.y,
+            width:6,
+            height:15,
+            speed:8
+        });
+    }
+});
+
+document.addEventListener("keyup",(e)=>{
+    keys[e.key.toLowerCase()] = false;
+});
+
+function drawBackground(){
+    c.fillStyle="black";
+    c.fillRect(0,0,canvas.width,canvas.height);
+
+    stars.forEach(star=>{
+        star.y += 2;
+        if(star.y > canvas.height){
+            star.y = 0;
+            star.x = Math.random()*canvas.width;
+        }
+        c.fillStyle="white";
+        c.fillRect(star.x,star.y,star.size,star.size);
+    });
+}
+
+function drawPlayer(){
+    let grad = c.createLinearGradient(
+        player.x,player.y,
+        player.x,player.y+player.height
+    );
+    grad.addColorStop(0,"#fff");
+    grad.addColorStop(1,"#555");
+
+    c.shadowColor="cyan";
+    c.shadowBlur=20;
+
+    c.fillStyle=grad;
+    c.beginPath();
+    c.moveTo(player.x+player.width/2,player.y);
+    c.lineTo(player.x+player.width,player.y+player.height-10);
+    c.lineTo(player.x,player.y+player.height-10);
+    c.closePath();
+    c.fill();
+
+    c.shadowBlur=0;
+
+    let flame = 20+Math.random()*10;
+    let flameGrad = c.createLinearGradient(
+        player.x,
+        player.y+player.height-10,
+        player.x,
+        player.y+player.height+flame
+    );
+    flameGrad.addColorStop(0,"yellow");
+    flameGrad.addColorStop(1,"red");
+
+    c.fillStyle=flameGrad;
+    c.beginPath();
+    c.moveTo(player.x+10,player.y+player.height-10);
+    c.lineTo(player.x+player.width-10,player.y+player.height-10);
+    c.lineTo(player.x+player.width/2,
+             player.y+player.height+flame);
+    c.closePath();
+    c.fill();
+}
+
+function drawBullets(){
+    bullets.forEach((b,i)=>{
+        b.y -= b.speed;
+        c.fillStyle="cyan";
+        c.fillRect(b.x,b.y,b.width,b.height);
+        if(b.y < 0) bullets.splice(i,1);
+    });
+}
+
+function drawEnemies(){
+    enemies.forEach((enemy,i)=>{
+        enemy.y += enemy.speed;
+
+        c.fillStyle="red";
+        c.fillRect(enemy.x,enemy.y,
+                   enemy.width,enemy.height);
+
+        // Bullet collision
+        bullets.forEach((b,j)=>{
+            if(
+                b.x < enemy.x + enemy.width &&
+                b.x + b.width > enemy.x &&
+                b.y < enemy.y + enemy.height &&
+                b.y + b.height > enemy.y
+            ){
+                enemies.splice(i,1);
+                bullets.splice(j,1);
+                score += 20;
+            }
+        });
+
+        // Player collision
+        if(
+            player.x < enemy.x + enemy.width &&
+            player.x + player.width > enemy.x &&
+            player.y < enemy.y + enemy.height &&
+            player.y + player.height > enemy.y
+        ){
+            health -= 20;
+            enemies.splice(i,1);
+        }
+
+        if(enemy.y > canvas.height){
+            enemies.splice(i,1);
+        }
+    });
+}
+
+function drawHUD(){
+    c.fillStyle="white";
+    c.font="20px Arial";
+    c.fillText("Score: "+score,20,30);
+    c.fillText("High: "+highScore,20,60);
+
+    // Health bar
+    c.fillStyle="gray";
+    c.fillRect(20,80,200,20);
+
+    c.fillStyle="lime";
+    c.fillRect(20,80,2*health,20);
+}
+
+function update(){
+
+    if(gameOver) return;
+
+    if(keys["a"] && player.x > 0)
+        player.x -= player.speed;
+
+    if(keys["d"] && player.x + player.width < canvas.width)
+        player.x += player.speed;
+
+    drawBackground();
+    drawPlayer();
+    drawBullets();
+    drawEnemies();
+    drawHUD();
+
+    if(score > highScore) highScore = score;
+
+    if(score % 200 === 0 && score !== 0)
+        enemySpeed += 0.01;
+
+    if(health <= 0){
+        gameOver = true;
+        restartBtn.style.display="block";
+    }
+
+    requestAnimationFrame(update);
+}
+
+restartBtn.addEventListener("click",()=>{
+    health=100;
+    score=0;
+    enemies=[];
+    bullets=[];
+    enemySpeed=3;
+    gameOver=false;
+    restartBtn.style.display="none";
+    update();
+});
+
+update();
+</script>
+</body>
+</html>
